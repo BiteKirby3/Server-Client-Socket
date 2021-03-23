@@ -5,22 +5,17 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 
 public class Server extends ServerSocket {
 
     private static final int SERVER_PORT = 8000;
-    private static boolean isPrint = false;
     private static List<String> user_list = new ArrayList<String>();
     private static List<ServerThread> thread_list = new ArrayList<ServerThread>();
-    private static LinkedList<Message> message_list = new LinkedList<Message>();
-
     
     public Server() throws IOException {
         super(SERVER_PORT);
-        new PrintOutThread();
         System.out.println("Server lanched.");
         try {
             while (true) {
@@ -33,46 +28,8 @@ public class Server extends ServerSocket {
         }
     }
 
-    
-
-    class PrintOutThread extends Thread {
-
-        public PrintOutThread() {
-            start();
-        }
-
-        @Override
-        public void run() {
-            while (true) {
-                if (!isPrint) {
-                    try {
-                        Thread.sleep(500);
-                        sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    continue;
-                }
-                
-                Message message = (Message) message_list.getFirst();
-                
-                for (int i = 0; i < thread_list.size(); i++) {
-                    ServerThread thread = thread_list.get(i);
-                    if (thread.num == 0) {
-                        thread.sendMessage(message);
-                    }
-                    
-                }
-                message_list.removeFirst();
-                isPrint = message_list.size() > 0 ? true : false;
-
-            }
-        }
-    }
-
    
     class ServerThread extends Thread {
-        private Socket client;
 
         private PrintWriter out;
 
@@ -80,12 +37,12 @@ public class Server extends ServerSocket {
 
         private String name;
 
-        private int num;
+        private Socket client;
 
-        public ServerThread(Socket s) throws IOException {
-            client = s;
-            out = new PrintWriter(client.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+        public ServerThread(Socket socket) throws IOException {
+            client = socket;
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             in.readLine();
 
             start();
@@ -94,35 +51,38 @@ public class Server extends ServerSocket {
         @Override
         public void run() {
             out.println("Entrer votre pseudo: ");
-            //System.out.println(getName());
+
             try {
                 int flag = 0;
                 String line = in.readLine();
                 while (!"quit".equals(line)) {
                     if (flag == 0) {
-                        num = 1;
+                        
+                        while (existName(line) == true) {
+                            out.println("Nom existant. Veuillez reentrer votre pseudo: ");
+                            line = in.readLine();
+                        }
                         name = line;
                         user_list.add(name);
                         thread_list.add(this);
-                        //out.println(name + " a rejoint la conversation.");
                         System.out.println(name + " a rejoint la conversation.");
-                        pushMessage(name, "");
+                        send(name + " a rejoint la conversation.");
                     } else {
-                        num = 0;
-                        pushMessage(name, line);
+                        System.out.println(name + ": " + line);
+                        send(name + " : " + line);
                     }
                     flag++;
                     line = in.readLine();
                     if ("quit".equals(line)) {
-                        num = -1;
-                        pushMessage(name, line);
+                        send(name + " a quitte la la conversation.");
                         System.out.println(name + " a quitte la conversation.");
-                    } 
-                    else System.out.println(name + ": " + line);
+                    }
                 }
                 out.println("byeClient");
             } catch (Exception e) {
-                e.printStackTrace();
+                //e.printStackTrace();
+                System.out.println(name + " a quitte la conversation.");
+                send(name + " a quitte la conversation.");
             } finally {
                 try {
                     client.close();
@@ -134,64 +94,27 @@ public class Server extends ServerSocket {
             }
         }
 
-        public void pushMessage(String name, String msg) {
-            Message message = new Message(name, msg);
-            message_list.addLast(message);
-            isPrint = true;
+        public void send(String s) {
+            for (ServerThread thread : thread_list) {
+                thread.out.println(s);
+                thread.out.flush();
+            }
         }
 
-        public void sendMessage(Message message) {
-            if (num == 1) {
-                out.println(message.getName() + " a rejoint la conversation.");
-                //num = 0;
+
+        public boolean existName(String name) {
+            for (String user : user_list) {
+                if (name.equals(user)) {
+                    return true;
+                }
             }
-            else if (num == -1) {
-                out.println(message.getName() + " a quitte la conversation.");
-                
-            }
-            else out.println(message.getName() + ": " + message.getMessage());
+            return false;
         }
+
     }
 
     public static void main(String[] args) throws IOException {
-        new Server();
+        Server sc = new Server();
     }
 }
 
-class Message {
-    String client;
-
-    String message;
-
-    public Message() {
-        super();
-    }
-
-    public Message(String client, String message) {
-        super();
-        this.client = client;
-        this.message = message;
-    }
-
-    public String getName() {
-        return client;
-    }
-
-    public void setName(String name) {
-        this.client = name;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    @Override
-    public String toString() {
-        return "Message [client=" + client + ", message=" + message + "]";
-    }
-
-}
