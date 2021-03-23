@@ -57,8 +57,7 @@ public class Server extends ServerSocket {
                 String line = in.readLine();
                 while (!"quit".equals(line)) {
                     if (flag == 0) {
-                        
-                        while (existName(line) == true) {
+                        while (user_list.contains(line)) {
                             out.println("Nom existant. Veuillez reentrer votre pseudo: ");
                             line = in.readLine();
                         }
